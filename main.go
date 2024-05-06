@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/dict"
+	pluralize "github.com/gertd/go-pluralize"
 )
 
 func main() {
@@ -73,6 +74,13 @@ func renderTemplate(w http.ResponseWriter, t *template.Template, params TmplPara
 	}
 }
 
+var pl *pluralize.Client
+
+func init() {
+	pl = pluralize.NewClient()
+	pl.AddSingularRule("(rect)a", "$1um")
+}
+
 func getDefinitions(serverAddr string, word string) ([]*dict.Defn, error) {
 	cli, err := dict.Dial("tcp", serverAddr)
 	if err != nil {
@@ -82,6 +90,10 @@ func getDefinitions(serverAddr string, word string) ([]*dict.Defn, error) {
 	defs, err := cli.Define("*", word)
 	if err != nil {
 		if strings.Contains(err.Error(), "552 no match") {
+			word_singular := pl.Singular(word)
+			if word_singular != word {
+				return getDefinitions(serverAddr, word_singular)
+			}
 			return nil, nil
 		}
 		return nil, fmt.Errorf("error from dict server: %v", err)
